@@ -16,29 +16,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       devOptions: {
         enabled: true,
-      },
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
-      manifest: {
-        name: 'CGPA Analyst',
-        short_name: 'CGPA Calc',
-        description: 'Advanced CGPA Calculator & Academic Performance Analyst',
-        theme_color: '#09090b',
-        background_color: '#09090b',
-        display: 'standalone',
-        icons: [
-          {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-          },
-        ],
+        suppressWarnings: true,
       },
       workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/.*/i,
@@ -67,6 +49,27 @@ export default defineConfig({
                 statuses: [0, 200],
               },
             },
+          },
+        ],
+      },
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      manifest: {
+        name: 'CGPA Analyst',
+        short_name: 'CGPA Calc',
+        description: 'Advanced CGPA Calculator & Academic Performance Analyst',
+        theme_color: '#09090b',
+        background_color: '#09090b',
+        display: 'standalone',
+        icons: [
+          {
+            src: 'pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
           },
         ],
       },
