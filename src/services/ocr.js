@@ -1,8 +1,64 @@
 import { createWorker } from 'tesseract.js'
 
 /**
- * Creates a cropped, upscaled, and preprocessed image strip.
- * Implements "Super-Resolution" by scaling 3x.
+ * Applies a convolution filter to sharpen the image.
+ * Kernel: High contrast edge detection.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Number} width
+ * @param {Number} height
+ */
+const applySharpenFilter = (ctx, width, height) => {
+  const imgData = ctx.getImageData(0, 0, width, height)
+  const data = imgData.data
+
+  // Weights: Center pixel is 5 (strong), neighbors are -1.
+  const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0]
+  const weight = 1 // Divide result by this
+
+  const side = Math.round(Math.sqrt(kernel.length))
+  const halfSide = Math.floor(side / 2)
+  const src = data
+  const sw = width
+  const sh = height
+  const output = new Uint8ClampedArray(data.length)
+
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      const sy = y
+      const sx = x
+      const dstOff = (y * sw + x) * 4
+      let r = 0,
+        g = 0,
+        b = 0
+
+      for (let cy = 0; cy < side; cy++) {
+        for (let cx = 0; cx < side; cx++) {
+          const scy = sy + cy - halfSide
+          const scx = sx + cx - halfSide
+          if (scy >= 0 && scy < sh && scx >= 0 && scx < sw) {
+            const srcOff = (scy * sw + scx) * 4
+            const wt = kernel[cy * side + cx]
+            r += src[srcOff] * wt
+            g += src[srcOff + 1] * wt
+            b += src[srcOff + 2] * wt
+          }
+        }
+      }
+      output[dstOff] = r / weight
+      output[dstOff + 1] = g / weight
+      output[dstOff + 2] = b / weight
+      output[dstOff + 3] = 255 // Alpha
+    }
+  }
+
+  // Write back to canvas
+  const finalImageData = new ImageData(output, width, height)
+  ctx.putImageData(finalImageData, 0, 0)
+}
+
+/**
+ * Creates a cropped, upscaled, and filtered image strip.
+ * Pipeline: 2x Upscale -> Contrast Boost -> Sharpening.
  * @param {HTMLImageElement} img - The source image
  * @param {Number} x - Start X (original scale)
  * @param {Number} width - Width of strip (original scale)
@@ -13,34 +69,22 @@ const createStrip = (img, x, width) => {
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
 
-    // 1. Super-Resolution: 300% Scaling
-    // We scale the dimensions by 3 to separate pixelated text
-    const scale = 3
+    // 1. 2x Upscaling (Preserve details)
+    const scale = 2
     canvas.width = width * scale
     canvas.height = img.height * scale
 
-    // Draw slice at 3x scale
+    // 2. Contrast Boost (Before drawing)
+    ctx.filter = 'contrast(1.8) grayscale(1)'
+    // Draw slice
     ctx.drawImage(img, x, 0, width, img.height, 0, 0, canvas.width, canvas.height)
 
-    // 2. Aggressive Binarization
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-    const data = imageData.data
-    // Hard threshold > 120 (User specified) to remove grey rows
-    const threshold = 120
+    // Reset filter so it doesn't affect future operations (though putImageData overwrites it anyway)
+    ctx.filter = 'none'
 
-    for (let i = 0; i < data.length; i += 4) {
-      // Simple Average Grayscale
-      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3
-      // Binarize
-      const val = avg > threshold ? 255 : 0
+    // 3. Sharpening Pass (Convolution)
+    applySharpenFilter(ctx, canvas.width, canvas.height)
 
-      data[i] = val
-      data[i + 1] = val
-      data[i + 2] = val
-      // Alpha remains unchanged
-    }
-
-    ctx.putImageData(imageData, 0, 0)
     canvas.toBlob(resolve, 'image/png')
   })
 }
@@ -104,7 +148,7 @@ export const parseZones = async (file, zones, onProgress) => {
   const wUnit = xC - xB
   const wGrade = w - xC
 
-  // Create Strips (Upscaled 3x)
+  // Create Strips (Upscaled & Filtered)
   const codeStripBlob = await createStrip(img, 0, wCode)
   const unitStripBlob = await createStrip(img, xB, wUnit)
   const gradeStripBlob = await createStrip(img, xC, wGrade)
@@ -121,7 +165,6 @@ export const parseZones = async (file, zones, onProgress) => {
 
   const runJob = async (blob, whitelist, pObj, type) => {
     // PSM 6: Assume a single uniform block of text.
-    // PSM 10 (Single Char) is bad for a vertical strip of multiple rows.
     // We use PSM 6 but rely on the whitelist.
     const worker = await createWorker(['eng'], 1, {
       logger: (m) => {
@@ -162,9 +205,6 @@ export const parseZones = async (file, zones, onProgress) => {
   const courses = []
   const maxLines = Math.max(codeLines.length, unitLines.length, gradeLines.length)
 
-  // Alignment heuristic: Tesseract skips empty lines often.
-  // We assume the rows align roughly. If huge mismatch, user verifies.
-
   for (let i = 0; i < maxLines; i++) {
     let c = (codeLines[i] || '').trim()
     let u = (unitLines[i] || '').trim()
@@ -174,7 +214,6 @@ export const parseZones = async (file, zones, onProgress) => {
     g = fixCommonErrors(g, 'grade')
 
     // Grade Parsing: extract 'A-F' from potentially '76B'
-    // If we have numbers, we might optionally want to keep them, but app mostly needs Grade letter.
     let gradeChar = 'A'
     const gradeMatch = g.match(/[A-F]$/) // Last letter
     if (gradeMatch) {

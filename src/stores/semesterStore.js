@@ -5,7 +5,7 @@ import { dbService } from '@/services/db'
 export const useSemesterStore = defineStore('semester', () => {
   const semesters = ref([])
 
-  // Load all semesters from DB
+  // Load all semesters from DB (Force HMR)
   async function loadAll() {
     const rawSemesters = await dbService.getAllSemesters()
     semesters.value = rawSemesters.sort((a, b) => (a.order ?? a.id) - (b.order ?? b.id))
@@ -45,6 +45,18 @@ export const useSemesterStore = defineStore('semester', () => {
     semesters.value = semesters.value.filter((s) => s.id !== id)
   }
 
+  // Rename a semester
+  async function renameSemester(id, newName) {
+    const semester = semesters.value.find((s) => s.id === id)
+    if (!semester) return
+
+    const updatedSemester = JSON.parse(JSON.stringify(semester))
+    updatedSemester.name = newName
+
+    await dbService.updateSemester(updatedSemester)
+    semester.name = newName
+  }
+
   // Add a course to a semester
   async function addCourse(semesterId, course) {
     const semester = semesters.value.find((s) => s.id === semesterId)
@@ -69,6 +81,20 @@ export const useSemesterStore = defineStore('semester', () => {
 
     const updatedSemester = JSON.parse(JSON.stringify(semester))
     updatedSemester.courses = updatedSemester.courses.filter((c) => c.id !== courseId)
+
+    semester.courses = updatedSemester.courses
+  }
+
+  // Update a course
+  async function updateCourse(semesterId, updatedCourse) {
+    const semester = semesters.value.find((s) => s.id === semesterId)
+    if (!semester) return
+
+    const updatedSemester = JSON.parse(JSON.stringify(semester))
+    const courseIndex = updatedSemester.courses.findIndex((c) => c.id === updatedCourse.id)
+    if (courseIndex === -1) return
+
+    updatedSemester.courses[courseIndex] = updatedCourse
 
     await dbService.updateSemester(updatedSemester)
     semester.courses = updatedSemester.courses
@@ -173,10 +199,12 @@ export const useSemesterStore = defineStore('semester', () => {
     semesters,
     loadAll,
     addSemester,
+    renameSemester,
     deleteSemester,
     reorderSemesters,
     clearAllSemesters,
     addCourse,
+    updateCourse,
     removeCourse,
     getSemesterGpa,
     cgpa,
