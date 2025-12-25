@@ -1,0 +1,33 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-display: 'Clash Display', sans-serif;
+
+  --color-primary: #18181b; /* zinc-950 */
+  --color-primary-foreground: #fafafa; /* zinc-50 */
+}
+
+/* Custom Utilities */
+@utility glass {
+  @apply backdrop-blur-md bg-white/10 border border-white/20 shadow-lg;
+}
+
+@utility glass-card {
+  @apply backdrop-blur-xl bg-black/40 border border-white/10 shadow-2xl rounded-2xl;
+}
+
+body {
+  @apply bg-zinc-950 text-zinc-100 font-sans antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  @apply font-display tracking-tight;
+}
