@@ -1,8 +1,9 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useSemesterStore } from '@/stores/semesterStore'
-import { Trash2, Plus, BookOpen, GraduationCap, GripVertical } from 'lucide-vue-next'
+import { Trash2, Plus, BookOpen, GraduationCap, GripVertical, Camera } from 'lucide-vue-next'
 import VueDraggable from 'vuedraggable'
+import ScannerModal from './ScannerModal.vue'
 
 const semesterStore = useSemesterStore()
 
@@ -12,6 +13,7 @@ const activeSemesterId = ref(null)
 const courseCode = ref('')
 const courseUnit = ref(null)
 const courseGrade = ref('A')
+const isScannerOpen = ref(false)
 
 const grades = ['A', 'B', 'C', 'D', 'E', 'F']
 
@@ -44,7 +46,7 @@ const handleDeleteSemester = async (id) => {
 }
 
 const handleAddCourse = async () => {
-  if (!activeSemesterId.value || !courseCode.value || !courseUnit.value) return
+  if (!activeSemesterId.value || !courseCode.value || courseUnit.value === null) return
 
   await semesterStore.addCourse(activeSemesterId.value, {
     code: courseCode.value.toUpperCase(),
@@ -56,6 +58,18 @@ const handleAddCourse = async () => {
   courseCode.value = ''
   courseUnit.value = null
   courseGrade.value = 'A'
+}
+
+const handleAddCoursesFromScan = async (courses) => {
+  if (!activeSemesterId.value) return
+
+  for (const course of courses) {
+    await semesterStore.addCourse(activeSemesterId.value, {
+      code: course.code,
+      unit: course.unit,
+      grade: course.grade,
+    })
+  }
 }
 
 const handleRemoveCourse = async (courseId) => {
@@ -81,7 +95,9 @@ onMounted(() => {
     </div>
 
     <!-- Semester Tabs/Selector -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-4 mb-4 scrollbar-thin flex-wrap justify-between">
+    <div
+      class="flex items-center gap-2 overflow-x-auto pb-4 mb-4 scrollbar-thin flex-wrap justify-between"
+    >
       <VueDraggable
         v-model="semestersList"
         item-key="id"
@@ -139,7 +155,7 @@ onMounted(() => {
         <h4 class="text-zinc-300 font-medium flex items-center">
           {{ semesterStore.semesters.find((s) => s.id === activeSemesterId)?.name }}
           <span
-            class="ml-3 text-sm font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20"
+            class="ml-3 text-sm font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20 mr-2"
           >
             GPA:
             {{
@@ -154,6 +170,16 @@ onMounted(() => {
           class="text-xs text-red-500 hover:text-red-400 flex items-center"
         >
           <Trash2 class="w-3 h-3 mr-1" /> Remove Semester
+        </button>
+      </div>
+
+      <div class="flex justify-end mb-4">
+        <button
+          @click="isScannerOpen = true"
+          class="flex items-center text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition-colors"
+        >
+          <Camera class="w-3.5 h-3.5 mr-1.5" />
+          Scan Result Slip
         </button>
       </div>
 
@@ -260,4 +286,10 @@ onMounted(() => {
       <p>Create a semester to get started</p>
     </div>
   </div>
+
+  <ScannerModal
+    :is-open="isScannerOpen"
+    @close="isScannerOpen = false"
+    @add-courses="handleAddCoursesFromScan"
+  />
 </template>
