@@ -39,14 +39,12 @@ onMounted(async () => {
     <!-- Main Container -->
     <div class="max-w-7xl mx-auto px-4 py-4 md:px-8">
       <!-- Header -->
-      <header
-        class="flex flex-col md:flex-row md:items-end justify-between mb-6 border-b border-white/5 pb-2"
-      >
+      <header class="flex items-center justify-between mb-6 border-b border-white/5 pb-2">
         <div>
           <h1 class="text-2xl md:text-4xl font-bold text-white tracking-tighter">CGPA Calc</h1>
         </div>
 
-        <div class="text-right flex items-end gap-6 justify-end">
+        <div class="text-right flex items-center gap-6 justify-end w-fit">
           <button
             @click="showSettings = true"
             class="p-2 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
@@ -55,6 +53,8 @@ onMounted(async () => {
           </button>
         </div>
       </header>
+
+      <p class="text-zinc-400 text-xl font-medium mb-2">Hi, {{ userStore.profile.name }}</p>
 
       <!-- Content Grid -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
