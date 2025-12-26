@@ -7,6 +7,11 @@ const semesterStore = useSemesterStore()
 
 const degreeClass = computed(() => {
   const cgpa = Number(semesterStore.cgpa)
+  const totalUnits = semesterStore.totalUnits
+
+  if (totalUnits === 0)
+    return { label: 'No Grades Yet', color: 'text-zinc-500', bg: 'bg-zinc-500/10' }
+
   if (cgpa >= 4.5)
     return { label: 'First Class Honors', color: 'text-emerald-400', bg: 'bg-emerald-500/20' }
   if (cgpa >= 3.5)
@@ -20,6 +25,10 @@ const degreeClass = computed(() => {
 
 const cgpaColor = computed(() => {
   const cgpa = Number(semesterStore.cgpa)
+  const totalUnits = semesterStore.totalUnits
+
+  if (totalUnits === 0) return 'text-zinc-500'
+
   if (cgpa >= 4.5) return 'text-emerald-400'
   if (cgpa >= 3.5) return 'text-emerald-300'
   if (cgpa >= 2.5) return 'text-amber-400'
