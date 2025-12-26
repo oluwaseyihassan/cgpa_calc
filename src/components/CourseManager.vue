@@ -81,24 +81,29 @@ onMounted(() => {
     </div>
 
     <!-- Semester Tabs/Selector -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-4 mb-4 scrollbar-thin flex-wrap justify-between">
+    <div
+      class="flex items-center gap-2 overflow-x-auto pb-4 mb-4 scrollbar-thin flex-wrap justify-between"
+    >
       <VueDraggable
         v-model="semestersList"
         item-key="id"
         class="flex items-center gap-2 flex-wrap"
         :animation="200"
+        handle=".drag-handle"
       >
         <template #item="{ element: sem }">
           <button
             @click="activeSemesterId = sem.id"
-            class="px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-all duration-200 border flex items-center group cursor-grab active:cursor-grabbing"
+            class="px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-all duration-200 border flex items-center group cursor-pointer"
             :class="
               activeSemesterId === sem.id
                 ? 'bg-white text-black border-white'
                 : 'bg-transparent text-zinc-400 border-zinc-700 hover:border-zinc-500'
             "
           >
-            <GripVertical class="w-3 h-3 mr-1 opacity-50 group-hover:opacity-100" />
+            <GripVertical
+              class="w-4 h-4 mr-1 opacity-50 group-hover:opacity-100 drag-handle cursor-grab active:cursor-grabbing"
+            />
             {{ sem.name }}
             <span
               class="ml-2 text-[10px] px-1.5 py-0.5 rounded-md transition-colors"
