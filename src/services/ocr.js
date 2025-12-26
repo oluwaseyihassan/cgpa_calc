@@ -75,7 +75,7 @@ const createStrip = (img, x, width) => {
     canvas.height = img.height * scale
 
     // 2. Contrast Boost (Before drawing)
-    ctx.filter = 'contrast(1.8) grayscale(1)'
+    ctx.filter = 'contrast(2.0) grayscale(1)'
     // Draw slice
     ctx.drawImage(img, x, 0, width, img.height, 0, 0, canvas.width, canvas.height)
 
@@ -237,6 +237,6 @@ export const parseZones = async (file, zones, onProgress) => {
       })
     }
   }
-
+  console.log(courses)
   return courses
 }
