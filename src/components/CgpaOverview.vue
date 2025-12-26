@@ -66,7 +66,6 @@ const cgpaColor = computed(() => {
             />
             {{ degreeClass.label }}
           </div>
-          <p class="text-zinc-500 text-xs mt-1 pl-1">Cumulative Grade Point Average</p>
         </div>
       </div>
 
