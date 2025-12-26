@@ -1,8 +1,19 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { useSemesterStore } from '@/stores/semesterStore'
-import { Trash2, Plus, BookOpen, GraduationCap, GripVertical } from 'lucide-vue-next'
+import {
+  Trash2,
+  Plus,
+  BookOpen,
+  GraduationCap,
+  GripVertical,
+  Camera,
+  Pencil,
+  Check,
+  X as XIcon,
+} from 'lucide-vue-next'
 import VueDraggable from 'vuedraggable'
+import ScannerModal from './ScannerModal.vue'
 
 const semesterStore = useSemesterStore()
 
@@ -12,6 +23,7 @@ const activeSemesterId = ref(null)
 const courseCode = ref('')
 const courseUnit = ref(null)
 const courseGrade = ref('A')
+const isScannerOpen = ref(false)
 
 const grades = ['A', 'B', 'C', 'D', 'E', 'F']
 
@@ -25,6 +37,57 @@ const loadData = async () => {
   if (semesterStore.semesters.length > 0 && !activeSemesterId.value) {
     activeSemesterId.value = semesterStore.semesters[0].id // Default to first
   }
+}
+
+// Rename Logic
+const isEditingName = ref(false)
+const editingName = ref('')
+const nameInput = ref(null)
+
+const startEditingName = () => {
+  const sem = semesterStore.semesters.find((s) => s.id === activeSemesterId.value)
+  if (sem) {
+    editingName.value = sem.name
+    isEditingName.value = true
+    nextTick(() => nameInput.value?.focus())
+  }
+}
+
+const saveSemesterName = async () => {
+  if (!editingName.value.trim()) return
+  await semesterStore.renameSemester(activeSemesterId.value, editingName.value)
+  isEditingName.value = false
+}
+
+const cancelEditName = () => {
+  isEditingName.value = false
+}
+
+// Course Edit Logic
+const editingCourseId = ref(null)
+const editingCourseData = ref({ code: '', unit: 0, grade: 'A' })
+
+const startEditingCourse = (course) => {
+  editingCourseId.value = course.id
+  editingCourseData.value = { ...course }
+}
+
+const cancelEditCourse = () => {
+  editingCourseId.value = null
+  editingCourseData.value = { code: '', unit: 0, grade: 'A' }
+}
+
+const saveCourseEdit = async () => {
+  if (!editingCourseId.value || !activeSemesterId.value) return
+
+  await semesterStore.updateCourse(activeSemesterId.value, {
+    id: editingCourseId.value,
+    ...editingCourseData.value,
+    code: editingCourseData.value.code.toUpperCase(),
+    unit: Number(editingCourseData.value.unit),
+  })
+
+  editingCourseId.value = null
 }
 
 const handleAddSemester = async () => {
@@ -44,7 +107,7 @@ const handleDeleteSemester = async (id) => {
 }
 
 const handleAddCourse = async () => {
-  if (!activeSemesterId.value || !courseCode.value || !courseUnit.value) return
+  if (!activeSemesterId.value || !courseCode.value || courseUnit.value === null) return
 
   await semesterStore.addCourse(activeSemesterId.value, {
     code: courseCode.value.toUpperCase(),
@@ -56,6 +119,18 @@ const handleAddCourse = async () => {
   courseCode.value = ''
   courseUnit.value = null
   courseGrade.value = 'A'
+}
+
+const handleAddCoursesFromScan = async (courses) => {
+  if (!activeSemesterId.value) return
+
+  for (const course of courses) {
+    await semesterStore.addCourse(activeSemesterId.value, {
+      code: course.code,
+      unit: course.unit,
+      grade: course.grade,
+    })
+  }
 }
 
 const handleRemoveCourse = async (courseId) => {
@@ -141,10 +216,38 @@ onMounted(() => {
     <!-- Active Semester Content -->
     <div v-if="activeSemesterId" class="flex-1">
       <div class="flex justify-between items-center mb-4">
-        <h4 class="text-zinc-300 font-medium flex items-center">
-          {{ semesterStore.semesters.find((s) => s.id === activeSemesterId)?.name }}
+        <div class="flex items-center gap-2 flex-1">
+          <div v-if="isEditingName" class="flex items-center gap-2">
+            <input
+              ref="nameInput"
+              v-model="editingName"
+              class="bg-black/30 border border-zinc-700 rounded px-2 py-1 text-white text-lg font-medium focus:border-emerald-500 focus:outline-none"
+              @keyup.enter="saveSemesterName"
+              @blur="saveSemesterName"
+            />
+            <button
+              @click="saveSemesterName"
+              class="p-1 text-emerald-400 hover:bg-emerald-500/10 rounded"
+            >
+              <Check class="w-4 h-4" />
+            </button>
+            <button @click="cancelEditName" class="p-1 text-red-400 hover:bg-red-500/10 rounded">
+              <XIcon class="w-4 h-4" />
+            </button>
+          </div>
+          <h4 v-else class="text-zinc-300 font-medium flex items-center text-lg">
+            {{ semesterStore.semesters.find((s) => s.id === activeSemesterId)?.name }}
+            <button
+              @click="startEditingName"
+              class="ml-2 p-1 text-zinc-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+            >
+              <Pencil class="w-3.5 h-3.5" />
+            </button>
+          </h4>
+
           <span
-            class="ml-3 text-sm font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20"
+            v-if="!isEditingName"
+            class="text-sm font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20"
           >
             GPA:
             {{
@@ -153,12 +256,23 @@ onMounted(() => {
               )
             }}
           </span>
-        </h4>
+        </div>
+
         <button
           @click="handleDeleteSemester(activeSemesterId)"
           class="text-xs text-red-500 hover:text-red-400 flex items-center"
         >
           <Trash2 class="w-3 h-3 mr-1" /> Remove Semester
+        </button>
+      </div>
+
+      <div class="flex justify-end mb-4">
+        <button
+          @click="isScannerOpen = true"
+          class="flex items-center text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition-colors"
+        >
+          <Camera class="w-3.5 h-3.5 mr-1.5" />
+          Scan Result Slip
         </button>
       </div>
 
@@ -226,7 +340,43 @@ onMounted(() => {
           :key="course.id"
           class="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group"
         >
-          <div class="flex items-center">
+          <div v-if="editingCourseId === course.id" class="flex-1 flex items-center gap-2 mr-2">
+            <input
+              v-model="editingCourseData.code"
+              class="w-20 bg-black/30 border border-zinc-700 rounded px-2 py-1 text-white text-sm font-bold uppercase focus:border-emerald-500 focus:outline-none"
+              placeholder="Code"
+              @keyup.enter="saveCourseEdit"
+            />
+            <input
+              v-model="editingCourseData.unit"
+              type="number"
+              min="0"
+              class="w-12 bg-black/30 border border-zinc-700 rounded px-2 py-1 text-white text-xs focus:border-emerald-500 focus:outline-none"
+              @keyup.enter="saveCourseEdit"
+            />
+            <select
+              v-model="editingCourseData.grade"
+              class="w-14 bg-zinc-800 border border-zinc-700 rounded px-1 py-1 text-white text-xs focus:border-emerald-500 focus:outline-none"
+            >
+              <option v-for="grade in grades" :key="grade" :value="grade">{{ grade }}</option>
+            </select>
+
+            <button
+              @click="saveCourseEdit"
+              class="text-emerald-400 hover:bg-emerald-500/10 p-1 rounded"
+            >
+              <Check class="w-4 h-4" />
+            </button>
+            <button @click="cancelEditCourse" class="text-red-400 hover:bg-red-500/10 p-1 rounded">
+              <XIcon class="w-4 h-4" />
+            </button>
+          </div>
+
+          <div
+            v-else
+            class="flex items-center flex-1 cursor-pointer"
+            @click="startEditingCourse(course)"
+          >
             <div
               class="w-8 h-8 rounded-md flex items-center justify-center font-bold text-sm mr-3"
               :class="
@@ -243,9 +393,12 @@ onMounted(() => {
               <p class="font-bold text-sm text-zinc-200">{{ course.code }}</p>
               <p class="text-xs text-zinc-500">{{ course.unit }} Units</p>
             </div>
+            <Pencil class="w-3 h-3 ml-2 text-zinc-600 opacity-0 group-hover:opacity-50" />
           </div>
+
           <button
-            @click="handleRemoveCourse(course.id)"
+            v-if="editingCourseId !== course.id"
+            @click.stop="handleRemoveCourse(course.id)"
             class="p-2 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <Trash2 class="w-4 h-4" />
@@ -265,4 +418,10 @@ onMounted(() => {
       <p>Create a semester to get started</p>
     </div>
   </div>
+
+  <ScannerModal
+    :is-open="isScannerOpen"
+    @close="isScannerOpen = false"
+    @add-courses="handleAddCoursesFromScan"
+  />
 </template>

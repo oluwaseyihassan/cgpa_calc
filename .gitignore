@@ -11,9 +11,9 @@ node_modules
 .DS_Store
 dist
 dist-ssr
+dev-dist
 coverage
 *.local
-dev-dist*
 
 # Editor directories and files
 .vscode/*
@@ -35,3 +35,4 @@ dev-dist*
 
 # Vitest
 __screenshots__/
+dev-dist
