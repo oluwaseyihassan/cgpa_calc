@@ -239,7 +239,7 @@ onMounted(() => {
             {{ semesterStore.semesters.find((s) => s.id === activeSemesterId)?.name }}
             <button
               @click="startEditingName"
-              class="ml-2 p-1 text-zinc-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+              class="ml-2 p-1 text-zinc-500 hover:text-white transition-colors opacity-50 hover:opacity-100"
             >
               <Pencil class="w-3.5 h-3.5" />
             </button>
