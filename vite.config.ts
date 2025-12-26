@@ -54,7 +54,7 @@ export default defineConfig({
       },
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'CGPA Analyst',
+        name: 'CGPA Calculator',
         short_name: 'CGPA Calc',
         description: 'Advanced CGPA Calculator & Academic Performance Analyst',
         theme_color: '#09090b',
@@ -62,14 +62,28 @@ export default defineConfig({
         display: 'standalone',
         icons: [
           {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
+            src: 'pwa-196x196.png',
+            sizes: '196x196',
             type: 'image/png',
           },
           {
             src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
+          },
+        ],
+        screenshots: [
+          {
+            src: 'screenshot-mobile.png', // Put this image in public/ folder too
+            sizes: '505x739', // Exact size of the image
+            type: 'image/png',
+            form_factor: 'narrow', // Tells browser this is for mobile
+          },
+          {
+            src: 'screenshot-desktop.png', // Put this image in public/ folder too
+            sizes: '846x431',
+            type: 'image/png',
+            form_factor: 'wide', // Tells browser this is for desktop
           },
         ],
       },
