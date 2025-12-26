@@ -35,15 +35,6 @@ const handleUnlock = async () => {
       v-if="!userStore.isAuthenticated"
       class="fixed inset-0 z-[100] bg-zinc-950 flex flex-col items-center justify-center p-4"
     >
-      <!-- Background Effects -->
-      <div class="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div
-          class="absolute top-[20%] right-[20%] w-[300px] h-[300px] bg-emerald-500/10 rounded-full blur-[80px]"
-        ></div>
-        <div
-          class="absolute bottom-[20%] left-[20%] w-[300px] h-[300px] bg-indigo-500/10 rounded-full blur-[80px]"
-        ></div>
-      </div>
 
       <div class="relative z-10 flex flex-col items-center max-w-sm w-full text-center">
         <div
