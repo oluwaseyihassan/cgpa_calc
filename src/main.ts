@@ -1,6 +1,9 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { registerSW } from 'virtual:pwa-register'
+import { inject } from '@vercel/analytics'
+
+inject()
 
 registerSW({ immediate: true })
 
