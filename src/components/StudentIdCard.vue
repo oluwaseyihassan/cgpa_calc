@@ -1,28 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useUserStore } from '@/stores/userStore'
-import { User, Fingerprint, Upload, Building2 } from 'lucide-vue-next'
+import { User, Fingerprint, Building2 } from 'lucide-vue-next'
 
 const userStore = useUserStore()
-const fileInput = ref(null)
-
-const photoUrl = computed(() => {
-  if (userStore.profile.photoBlob) {
-    return URL.createObjectURL(userStore.profile.photoBlob)
-  }
-  return null
-})
-
-const handleFileChange = (event) => {
-  const file = event.target.files[0]
-  if (file) {
-    userStore.updateProfile({ photoBlob: file })
-  }
-}
-
-const triggerFileInput = () => {
-  fileInput.value.click()
-}
 
 const isToggling = ref(false)
 
@@ -44,36 +25,14 @@ const toggleBiometrics = async () => {
 
 <template>
   <div class="glass-card p-6 w-full max-w-md mx-auto relative overflow-hidden group">
-
-
     <div class="relative z-10 flex flex-col items-center text-center">
       <!-- Photo -->
       <div class="relative mb-6">
         <div
-          class="w-32 h-32 rounded-full border-4 border-white/10 overflow-hidden shadow-xl bg-black/50 flex items-center justify-center cursor-pointer hover:border-emerald-500/50 transition-colors"
-          @click="triggerFileInput"
+          class="w-20 h-20 rounded-full border-4 border-white/10 overflow-hidden shadow-xl bg-black/50 flex items-center justify-center"
         >
-          <img
-            v-if="photoUrl"
-            :src="photoUrl"
-            class="w-full h-full object-cover"
-            alt="Student Photo"
-          />
-          <User v-else class="w-12 h-12 text-zinc-500" />
-
-          <div
-            class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
-          >
-            <Upload class="w-6 h-6 text-white" />
-          </div>
+          <User class="w-12 h-12 text-zinc-500" />
         </div>
-        <input
-          type="file"
-          ref="fileInput"
-          class="hidden"
-          accept="image/*"
-          @change="handleFileChange"
-        />
       </div>
 
       <!-- Details -->
