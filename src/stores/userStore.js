@@ -7,7 +7,6 @@ export const useUserStore = defineStore('user', () => {
     name: 'Guest User',
     name: 'Guest User',
     department: 'General',
-    photoBlob: null,
     biometricsEnabled: false,
   })
 
