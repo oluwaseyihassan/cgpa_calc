@@ -4,6 +4,7 @@ import { useUserStore } from '@/stores/userStore'
 import { useSemesterStore } from '@/stores/semesterStore'
 import { X, Save, Settings, Trash2 } from 'lucide-vue-next'
 import StudentIdCard from '@/components/StudentIdCard.vue'
+import DataBackup from '@/components/DataBackup.vue'
 
 const props = defineProps(['open'])
 const emit = defineEmits(['update:open'])
@@ -89,6 +90,11 @@ const handleReset = async () => {
             <h4 class="text-sm font-bold text-red-500 mb-2 flex items-center">
               <Trash2 class="w-4 h-4 mr-1" /> Data Management
             </h4>
+
+            <div class="mb-4">
+              <DataBackup />
+            </div>
+
             <button
               @click="handleReset"
               class="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 py-2 rounded-lg transition-colors text-sm font-medium"
