@@ -139,19 +139,20 @@ export const parseZones = async (file, zones, onProgress) => {
   })
 
   const w = img.width
-  const xA = Math.floor(zones.lineA * w)
-  const xB = Math.floor(zones.lineB * w)
-  const xC = Math.floor(zones.lineC * w)
+  const xCodeEnd = Math.floor(zones.codeEnd * w)
+  const xUnitStart = Math.floor(zones.unitStart * w)
+  const xUnitEnd = Math.floor(zones.unitEnd * w)
+  const xGradeStart = Math.floor(zones.gradeStart * w)
 
   // define widths
-  const wCode = xA
-  const wUnit = xC - xB
-  const wGrade = w - xC
+  const wCode = xCodeEnd
+  const wUnit = xUnitEnd - xUnitStart
+  const wGrade = w - xGradeStart
 
   // Create Strips (Upscaled & Filtered)
   const codeStripBlob = await createStrip(img, 0, wCode)
-  const unitStripBlob = await createStrip(img, xB, wUnit)
-  const gradeStripBlob = await createStrip(img, xC, wGrade)
+  const unitStripBlob = await createStrip(img, xUnitStart, wUnit)
+  const gradeStripBlob = await createStrip(img, xGradeStart, wGrade)
 
   // 2. Run Tesseract Jobs
   const progress1 = { val: 0 }
@@ -192,8 +193,8 @@ export const parseZones = async (file, zones, onProgress) => {
 
   // Define Whitelists
   // Unit: Numbers only
-  // Grade: A-F + Numbers (to support Score "67B" or "76" fixes) + T (to allow capturing "TE" artifact to fix)
-  const gradeWhitelist = 'ABCDEF0123456789T'
+  // Grade: A-F + Numbers + T + . (for decimals like 77.5)
+  const gradeWhitelist = 'ABCDEF0123456789T.'
 
   const [codeLines, unitLines, gradeLines] = await Promise.all([
     runJob(codeStripBlob, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ', progress1, 'code'),
@@ -205,6 +206,15 @@ export const parseZones = async (file, zones, onProgress) => {
   const courses = []
   const maxLines = Math.max(codeLines.length, unitLines.length, gradeLines.length)
 
+  const getGradeFromScore = (score) => {
+    if (score >= 70) return 'A'
+    if (score >= 60) return 'B'
+    if (score >= 50) return 'C'
+    if (score >= 45) return 'D'
+    if (score >= 40) return 'E'
+    return 'F'
+  }
+
   for (let i = 0; i < maxLines; i++) {
     let c = (codeLines[i] || '').trim()
     let u = (unitLines[i] || '').trim()
@@ -213,27 +223,44 @@ export const parseZones = async (file, zones, onProgress) => {
     // Apply Leetspeak Fixes
     g = fixCommonErrors(g, 'grade')
 
-    // Grade Parsing: extract 'A-F' from potentially '76B'
-    let gradeChar = 'A'
+    // Grade Parsing strategy:
+    // 1. Look for explicit letter grade (A-F) at the end
+    // 2. If not found, look for a numeric score and convert it
+    let gradeChar = null
+
     const gradeMatch = g.match(/[A-F]$/) // Last letter
     if (gradeMatch) {
       gradeChar = gradeMatch[0]
     } else {
-      // Fallback: Check if g is just a Grade letter
-      if (/^[A-F]$/.test(g)) gradeChar = g
+      // Fallback: Check if g is a number (Score only) e.g. "77.5"
+      // Remove potential noise but keep digits and dots
+      const scoreMatch = g.match(/(\d+(?:\.\d+)?)/)
+      if (scoreMatch) {
+        const score = parseFloat(scoreMatch[0])
+        if (!isNaN(score)) {
+          gradeChar = getGradeFromScore(score)
+        }
+      }
+
+      // Secondary Fallback: Check if g is just a Grade letter (isolated)
+      if (!gradeChar && /^[A-F]$/.test(g)) gradeChar = g
     }
+
+    // Default to 'F' or skip? Current logic implies skipping if no data.
+    // If we have a code and unit but no grade, maybe better to warn?
+    // For now, let's assume if gradeChar is resolved, we use it.
 
     // Code Formatting: "CSC101" -> "CSC 101"
     if (c.length >= 6 && !c.includes(' ')) {
       c = c.replace(/(\d{3})$/, ' $1')
     }
 
-    if (c || u || g) {
+    if (c || u || gradeChar) {
       courses.push({
         id: crypto.randomUUID(),
         code: c,
         unit: Number(u) || 0,
-        grade: gradeChar,
+        grade: gradeChar || 'F', // Default to F if unrecognized but row exists
       })
     }
   }
