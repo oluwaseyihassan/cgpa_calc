@@ -18,7 +18,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'add-courses'])
 
-// States: 'upload' | 'zones' | 'processing' | 'review'
+// States: 'upload' | 'crop' | 'zones' | 'processing' | 'review'
 const step = ref('upload')
 const isDragging = ref(false)
 const progress = ref(0)
@@ -34,9 +34,13 @@ const previewUrl = ref(null)
 // Zone Editor State
 const zoneContainerInfo = ref(null) // { width, height }
 // Positions as percentages (0 to 1)
-const lineA = ref(0.25) // Code / Title separator
-const lineB = ref(0.75) // Title / Unit separator
-const lineC = ref(0.85) // Unit / Grade separator
+const codeEnd = ref(0.25)
+const unitStart = ref(0.7)
+const unitEnd = ref(0.8)
+const gradeStart = ref(0.85)
+
+// Crop State
+const cropRect = ref({ x: 10, y: 10, w: 80, h: 80 }) // Percentages
 
 const handleClose = () => {
   setTimeout(resetState, 300)
@@ -59,7 +63,19 @@ const triggerFileInput = () => {
 
 const handleFileSelect = (event) => {
   const file = event.target.files[0]
-  if (file) prepareZoneEditor(file)
+  if (file) prepareCropEditor(file)
+}
+
+const prepareCropEditor = (file) => {
+  if (!file.type.startsWith('image/')) {
+    error.value = 'Invalid file type'
+    return
+  }
+  selectedFile.value = file
+  previewUrl.value = URL.createObjectURL(file)
+  step.value = 'crop'
+  // Reset crop rect
+  cropRect.value = { x: 10, y: 10, w: 80, h: 80 }
 }
 
 const prepareZoneEditor = (file) => {
@@ -72,9 +88,10 @@ const prepareZoneEditor = (file) => {
   step.value = 'zones'
 
   // Reset lines to defaults
-  lineA.value = 0.25
-  lineB.value = 0.7
-  lineC.value = 0.85
+  codeEnd.value = 0.25
+  unitStart.value = 0.7
+  unitEnd.value = 0.8
+  gradeStart.value = 0.85
 }
 
 // Dragging Logic
@@ -101,15 +118,20 @@ const updateLinePos = (clientX) => {
   // Constraints
   pct = Math.max(0, Math.min(1, pct))
 
-  if (activeLine.value === 'A') {
-    pct = Math.min(pct, lineB.value - 0.05)
-    lineA.value = pct
-  } else if (activeLine.value === 'B') {
-    pct = Math.max(lineA.value + 0.05, Math.min(pct, lineC.value - 0.05))
-    lineB.value = pct
-  } else if (activeLine.value === 'C') {
-    pct = Math.max(lineB.value + 0.05, pct)
-    lineC.value = pct
+  const minGap = 0.02
+
+  if (activeLine.value === 'codeEnd') {
+    pct = Math.min(pct, unitStart.value - minGap)
+    codeEnd.value = pct
+  } else if (activeLine.value === 'unitStart') {
+    pct = Math.max(codeEnd.value + minGap, Math.min(pct, unitEnd.value - minGap))
+    unitStart.value = pct
+  } else if (activeLine.value === 'unitEnd') {
+    pct = Math.max(unitStart.value + minGap, Math.min(pct, gradeStart.value - minGap))
+    unitEnd.value = pct
+  } else if (activeLine.value === 'gradeStart') {
+    pct = Math.max(unitEnd.value + minGap, pct)
+    gradeStart.value = pct
   }
 }
 
@@ -127,6 +149,104 @@ const stopDrag = () => {
   document.removeEventListener('touchend', stopDrag)
 }
 
+// Crop Logic & Dragging
+const activeHandle = ref(null) // 'nw', 'ne', 'sw', 'se', 'drag'
+
+const startCropDrag = (handle, e) => {
+  e.preventDefault()
+  activeHandle.value = handle
+  document.addEventListener('mousemove', onCropDrag)
+  document.addEventListener('mouseup', stopCropDrag)
+  document.addEventListener('touchmove', onTouchCropDrag, { passive: false })
+  document.addEventListener('touchend', stopCropDrag)
+}
+
+const updateCropRect = (clientX, clientY) => {
+  if (!activeHandle.value) return
+  const container = document.getElementById('crop-image-container')
+  if (!container) return
+  const rect = container.getBoundingClientRect()
+
+  const x = ((clientX - rect.left) / rect.width) * 100
+  const y = ((clientY - rect.top) / rect.height) * 100
+
+  const c = cropRect.value
+  const minSize = 5
+
+  if (activeHandle.value === 'drag') {
+    // Not implementing drag move for now to keep it simple, or maybe later
+  } else if (activeHandle.value === 'nw') {
+    const newX = Math.min(x, c.x + c.w - minSize)
+    const newY = Math.min(y, c.y + c.h - minSize)
+    c.w = c.x + c.w - newX
+    c.h = c.y + c.h - newY
+    c.x = newX
+    c.y = newY
+  } else if (activeHandle.value === 'ne') {
+    const newX = Math.max(x, c.x + minSize)
+    const newY = Math.min(y, c.y + c.h - minSize)
+    c.w = newX - c.x
+    c.h = c.y + c.h - newY
+    c.y = newY
+  } else if (activeHandle.value === 'sw') {
+    const newX = Math.min(x, c.x + c.w - minSize)
+    const newY = Math.max(y, c.y + minSize)
+    c.w = c.x + c.w - newX
+    c.h = newY - c.y
+    c.x = newX
+  } else if (activeHandle.value === 'se') {
+    c.w = Math.max(x - c.x, minSize)
+    c.h = Math.max(y - c.y, minSize)
+  }
+
+  // Clamping at 0-100
+  if (c.x < 0) {
+    c.w += c.x
+    c.x = 0
+  }
+  if (c.y < 0) {
+    c.h += c.y
+    c.y = 0
+  }
+  if (c.x + c.w > 100) c.w = 100 - c.x
+  if (c.y + c.h > 100) c.h = 100 - c.y
+}
+
+const onCropDrag = (e) => updateCropRect(e.clientX, e.clientY)
+const onTouchCropDrag = (e) => {
+  e.preventDefault()
+  updateCropRect(e.touches[0].clientX, e.touches[0].clientY)
+}
+
+const stopCropDrag = () => {
+  activeHandle.value = null
+  document.removeEventListener('mousemove', onCropDrag)
+  document.removeEventListener('mouseup', stopCropDrag)
+  document.removeEventListener('touchmove', onTouchCropDrag)
+  document.removeEventListener('touchend', stopCropDrag)
+}
+
+const confirmCrop = () => {
+  const img = new Image()
+  img.onload = () => {
+    const canvas = document.createElement('canvas')
+    // Calculate actual pixel coordinates
+    const sx = (cropRect.value.x / 100) * img.width
+    const sy = (cropRect.value.y / 100) * img.height
+    const sw = (cropRect.value.w / 100) * img.width
+    const sh = (cropRect.value.h / 100) * img.height
+
+    canvas.width = sw
+    canvas.height = sh
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh)
+
+    canvas.toBlob((blob) => {
+      prepareZoneEditor(blob)
+    }, 'image/png')
+  }
+  img.src = previewUrl.value
+}
 const startScan = async () => {
   if (!selectedFile.value) return
 
@@ -137,9 +257,10 @@ const startScan = async () => {
 
   try {
     const zones = {
-      lineA: lineA.value,
-      lineB: lineB.value,
-      lineC: lineC.value,
+      codeEnd: codeEnd.value,
+      unitStart: unitStart.value,
+      unitEnd: unitEnd.value,
+      gradeStart: gradeStart.value,
     }
 
     const courses = await parseZones(selectedFile.value, zones, (p) => {
@@ -235,16 +356,95 @@ const addAllCourses = () => {
           />
         </div>
 
+        <!-- Step 1.5: Crop -->
+        <div v-if="step === 'crop'" class="flex-1 flex flex-col">
+          <div
+            class="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg mb-4 text-xs text-blue-300"
+          >
+            <strong>Crop Image:</strong> Drag the corners to select only the table area.
+            <div class="mt-1 text-blue-200/70">
+              For best results, please <strong>crop out table headers</strong> and keep only the
+              data rows.
+            </div>
+          </div>
+
+          <div
+            class="relative flex-1 bg-black/50 rounded-lg overflow-hidden flex items-center justify-center border border-zinc-700 select-none"
+            style="min-height: 300px"
+          >
+            <div id="crop-image-container" class="relative inline-block max-h-full max-w-full">
+              <img :src="previewUrl" class="max-h-[50vh] object-contain pointer-events-none" />
+
+              <!-- Dim Overlay -->
+              <div class="absolute inset-0 bg-black/50"></div>
+
+              <!-- Crop Box -->
+              <div
+                class="absolute border-2 border-emerald-500 bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] box-content"
+                :style="{
+                  top: `${cropRect.y}%`,
+                  left: `${cropRect.x}%`,
+                  width: `${cropRect.w}%`,
+                  height: `${cropRect.h}%`,
+                }"
+              >
+                <!-- Grid Lines or Center Marker (Optional) -->
+
+                <!-- Handles -->
+                <!-- NW -->
+                <div
+                  class="absolute -top-2 -left-2 w-4 h-4 bg-emerald-500 rounded-full cursor-nw-resize z-20 hover:scale-125 transition-transform"
+                  @mousedown="startCropDrag('nw', $event)"
+                  @touchstart="startCropDrag('nw', $event)"
+                ></div>
+                <!-- NE -->
+                <div
+                  class="absolute -top-2 -right-2 w-4 h-4 bg-emerald-500 rounded-full cursor-ne-resize z-20 hover:scale-125 transition-transform"
+                  @mousedown="startCropDrag('ne', $event)"
+                  @touchstart="startCropDrag('ne', $event)"
+                ></div>
+                <!-- SW -->
+                <div
+                  class="absolute -bottom-2 -left-2 w-4 h-4 bg-emerald-500 rounded-full cursor-sw-resize z-20 hover:scale-125 transition-transform"
+                  @mousedown="startCropDrag('sw', $event)"
+                  @touchstart="startCropDrag('sw', $event)"
+                ></div>
+                <!-- SE -->
+                <div
+                  class="absolute -bottom-2 -right-2 w-4 h-4 bg-emerald-500 rounded-full cursor-se-resize z-20 hover:scale-125 transition-transform"
+                  @mousedown="startCropDrag('se', $event)"
+                  @touchstart="startCropDrag('se', $event)"
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 flex gap-3">
+            <button
+              @click="step = 'upload'"
+              class="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white text-sm font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              @click="confirmCrop"
+              class="flex-1 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-900/20"
+            >
+              Confirm Crop & Continue
+            </button>
+          </div>
+        </div>
+
         <!-- Step 2: Zone Editor -->
         <div v-if="step === 'zones'" class="flex-1 flex flex-col">
           <div
             class="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg mb-4 text-xs text-blue-300"
           >
-            <strong>Instruction:</strong> Drag the vertical lines to separate the columns.
+            <strong>Instruction:</strong> Adjust the 4 separation lines to define your columns.
             <ul class="list-disc list-inside mt-1 ml-1 text-blue-200/70">
-              <li>Line 1: Right side of COURSE CODE</li>
-              <li>Line 2: Left side of UNIT</li>
-              <li>Line 3: Left side of GRADE</li>
+              <li><strong>Line 1 (Green):</strong> End of Course Code</li>
+              <li><strong>Lines 2 & 3 (Amber):</strong> Start & End of Unit</li>
+              <li><strong>Line 4 (Purple):</strong> Start of Grade (to End of Row)</li>
             </ul>
           </div>
 
@@ -259,60 +459,91 @@ const addAllCourses = () => {
                 draggable="false"
               />
 
-              <!-- Line A -->
+              <!-- CODE END (Green) -->
               <div
                 class="absolute inset-y-0 w-1 bg-emerald-500 cursor-col-resize hover:shadow-[0_0_10px_rgba(16,185,129,0.8)] flex flex-col items-center z-10"
-                :style="{ left: `${lineA * 100}%` }"
-                @mousedown="startDrag('A', $event)"
-                @touchstart="startDrag('A', $event)"
+                :style="{ left: `${codeEnd * 100}%` }"
+                @mousedown="startDrag('codeEnd', $event)"
+                @touchstart="startDrag('codeEnd', $event)"
               >
                 <div
-                  class="bg-emerald-500 text-black text-[10px] font-bold px-1 rounded-sm mt-2 select-none"
+                  class="bg-emerald-500 text-black text-[10px] font-bold px-1 rounded-sm mt-2 select-none whitespace-nowrap"
                 >
-                  CODE
+                  CODE &larr;
                 </div>
               </div>
 
-              <!-- Line B -->
+              <!-- UNIT START (Amber) -->
               <div
                 class="absolute inset-y-0 w-1 bg-amber-500 cursor-col-resize hover:shadow-[0_0_10px_rgba(245,158,11,0.8)] flex flex-col items-center z-20"
-                :style="{ left: `${lineB * 100}%` }"
-                @mousedown="startDrag('B', $event)"
-                @touchstart="startDrag('B', $event)"
+                :style="{ left: `${unitStart * 100}%` }"
+                @mousedown="startDrag('unitStart', $event)"
+                @touchstart="startDrag('unitStart', $event)"
               >
                 <div
-                  class="bg-amber-500 text-black text-[10px] font-bold px-1 rounded-sm mt-2 select-none"
+                  class="bg-amber-500 text-black text-[10px] font-bold px-1 rounded-sm mt-8 select-none whitespace-nowrap"
                 >
-                  UNIT
+                  &rarr; UNIT
                 </div>
               </div>
 
-              <!-- Line C -->
+              <!-- UNIT END (Amber) -->
+              <div
+                class="absolute inset-y-0 w-1 bg-amber-500 cursor-col-resize hover:shadow-[0_0_10px_rgba(245,158,11,0.8)] flex flex-col items-center z-20"
+                :style="{ left: `${unitEnd * 100}%` }"
+                @mousedown="startDrag('unitEnd', $event)"
+                @touchstart="startDrag('unitEnd', $event)"
+              >
+                <div
+                  class="bg-amber-500 text-black text-[10px] font-bold px-1 rounded-sm mt-2 select-none whitespace-nowrap"
+                >
+                  UNIT &larr;
+                </div>
+              </div>
+
+              <!-- GRADE START (Purple) -->
               <div
                 class="absolute inset-y-0 w-1 bg-purple-500 cursor-col-resize hover:shadow-[0_0_10px_rgba(168,85,247,0.8)] flex flex-col items-center z-30"
-                :style="{ left: `${lineC * 100}%` }"
-                @mousedown="startDrag('C', $event)"
-                @touchstart="startDrag('C', $event)"
+                :style="{ left: `${gradeStart * 100}%` }"
+                @mousedown="startDrag('gradeStart', $event)"
+                @touchstart="startDrag('gradeStart', $event)"
               >
                 <div
-                  class="bg-purple-500 text-black text-[10px] font-bold px-1 rounded-sm mt-2 select-none"
+                  class="bg-purple-500 text-black text-[10px] font-bold px-1 rounded-sm mt-8 select-none whitespace-nowrap"
                 >
-                  GRADE
+                  &rarr; GRADE
                 </div>
               </div>
 
-              <!-- Zone Labels (Overlays) -->
+              <!-- Zone Overlays -->
+              <!-- Code Zone -->
               <div
                 class="absolute inset-y-0 bg-emerald-500/10 pointer-events-none border-r border-emerald-500/20"
-                :style="{ left: 0, width: `${lineA * 100}%` }"
+                :style="{ left: 0, width: `${codeEnd * 100}%` }"
               ></div>
+
+              <!-- Gap between Code & Unit (Grayed out) -->
               <div
-                class="absolute inset-y-0 bg-amber-500/10 pointer-events-none border-l border-amber-500/20 border-r border-purple-500/20"
-                :style="{ left: `${lineB * 100}%`, width: `${(lineC - lineB) * 100}%` }"
+                class="absolute inset-y-0 bg-black/40 pointer-events-none"
+                :style="{ left: `${codeEnd * 100}%`, width: `${(unitStart - codeEnd) * 100}%` }"
               ></div>
+
+              <!-- Unit Zone -->
+              <div
+                class="absolute inset-y-0 bg-amber-500/10 pointer-events-none border-l border-r border-amber-500/20"
+                :style="{ left: `${unitStart * 100}%`, width: `${(unitEnd - unitStart) * 100}%` }"
+              ></div>
+
+              <!-- Gap between Unit & Grade (Grayed out) -->
+              <div
+                class="absolute inset-y-0 bg-black/40 pointer-events-none"
+                :style="{ left: `${unitEnd * 100}%`, width: `${(gradeStart - unitEnd) * 100}%` }"
+              ></div>
+
+              <!-- Grade Zone -->
               <div
                 class="absolute inset-y-0 bg-purple-500/10 pointer-events-none border-l border-purple-500/20"
-                :style="{ left: `${lineC * 100}%`, right: 0 }"
+                :style="{ left: `${gradeStart * 100}%`, right: 0 }"
               ></div>
             </div>
           </div>
@@ -349,6 +580,15 @@ const addAllCourses = () => {
 
         <!-- Step 4: Review -->
         <div v-if="step === 'review'" class="space-y-4">
+          <div
+            class="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg text-xs text-amber-200 flex items-center"
+          >
+            <AlertCircle class="w-4 h-4 mr-2 shrink-0 mt-0.5" />
+            <p>
+              Please <strong>cross-check</strong> the scanned data below. OCR errors may occur. Click any field to edit.
+            </p>
+          </div>
+
           <div class="flex items-center justify-between">
             <h4 class="text-sm font-medium text-zinc-400">Review Scanned Data</h4>
             <span
