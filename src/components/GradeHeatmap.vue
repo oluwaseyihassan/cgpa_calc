@@ -14,7 +14,7 @@ const gradePercentages = computed(() => {
   const total = heatmapData.value.length
   if (total === 0) return []
 
-  const gradeCounts = { A: 0, B: 0, C: 0, D: 0, F: 0 }
+  const gradeCounts = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0 }
 
   heatmapData.value.forEach((item) => {
     if (gradeCounts.hasOwnProperty(item.grade)) {
