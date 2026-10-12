@@ -161,6 +161,9 @@ export const useSemesterStore = defineStore('semester', () => {
   })
 
   const gpaTrend = computed(() => {
+    let cumulativePoints = 0
+    let cumulativeUnits = 0
+
     return semesters.value.map((sem) => {
       let semPoints = 0
       let semUnits = 0
@@ -168,9 +171,14 @@ export const useSemesterStore = defineStore('semester', () => {
         semPoints += getGradePoint(c.grade) * Number(c.unit)
         semUnits += Number(c.unit)
       })
+
+      cumulativePoints += semPoints
+      cumulativeUnits += semUnits
+
       return {
         semester: sem.name,
-        gpa: semUnits === 0 ? 0 : (semPoints / semUnits).toFixed(2),
+        gpa: semUnits === 0 ? 0 : Number((semPoints / semUnits).toFixed(2)),
+        cgpa: cumulativeUnits === 0 ? 0 : Number((cumulativePoints / cumulativeUnits).toFixed(2)),
       }
     })
   })
