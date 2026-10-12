@@ -11,6 +11,7 @@ import {
   MoveHorizontal,
   RotateCcw,
   Sparkles,
+  ClipboardPaste,
 } from 'lucide-vue-next'
 import { parseZones, parseResultSlip } from '@/services/ocr'
 
@@ -74,7 +75,72 @@ const resetState = () => {
   activePreviewUrl.value = null
 }
 
+const handlePasteEvent = (e) => {
+  if (!props.isOpen || (step.value !== 'upload' && step.value !== 'crop')) return
+  const items = e.clipboardData?.items || []
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile()
+      if (file) {
+        e.preventDefault()
+        prepareCropEditor(file)
+        return
+      }
+    }
+  }
+}
+
+const pasteFromClipboard = async () => {
+  try {
+    error.value = null
+    if (!navigator.clipboard || !navigator.clipboard.read) {
+      error.value = 'Direct clipboard reading is not supported by your browser. Please press Ctrl+V to paste.'
+      return
+    }
+
+    const items = await navigator.clipboard.read()
+    for (const item of items) {
+      const imageType = item.types.find((t) => t.startsWith('image/'))
+      if (imageType) {
+        const blob = await item.getType(imageType)
+        const file = new File([blob], 'pasted_result_slip.png', { type: imageType })
+        prepareCropEditor(file)
+        return
+      }
+    }
+    error.value = 'No image found in clipboard. Take a screenshot (Win+Shift+S / Cmd+Shift+4) and paste.'
+  } catch (err) {
+    console.warn('Clipboard read failed:', err)
+    if (err.name === 'NotAllowedError') {
+      error.value = 'Clipboard access was blocked. Please grant clipboard permissions or use Ctrl+V.'
+    } else {
+      error.value = 'Unable to paste image from clipboard. Try pressing Ctrl+V.'
+    }
+  }
+}
+
+const handleDrop = (event) => {
+  const file = event.dataTransfer?.files?.[0]
+  if (file) {
+    prepareCropEditor(file)
+  }
+}
+
+watch(
+  () => props.isOpen,
+  (val) => {
+    if (val) {
+      window.addEventListener('paste', handlePasteEvent)
+    } else {
+      window.removeEventListener('paste', handlePasteEvent)
+      resetState()
+    }
+  },
+  { immediate: true }
+)
+
 onUnmounted(() => {
+  window.removeEventListener('paste', handlePasteEvent)
   if (originalPreviewUrl.value) URL.revokeObjectURL(originalPreviewUrl.value)
   if (activePreviewUrl.value && activePreviewUrl.value !== originalPreviewUrl.value) {
     URL.revokeObjectURL(activePreviewUrl.value)
@@ -510,29 +576,49 @@ const addAllCourses = () => {
           <div
             id="scanner-upload-box"
             @click="triggerFileInput"
-            class="border-2 border-dashed border-zinc-700 bg-zinc-800/30 hover:border-emerald-500 hover:bg-zinc-800/50 rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 group"
+            @dragover.prevent
+            @drop.prevent="handleDrop"
+            class="border-2 border-dashed border-zinc-700 bg-zinc-800/30 hover:border-emerald-500 hover:bg-zinc-800/50 rounded-xl p-8 sm:p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 group"
           >
             <div
-              class="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"
+              class="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-inner"
             >
               <Upload
                 class="w-8 h-8 text-zinc-400 group-hover:text-emerald-400 transition-colors"
               />
             </div>
             <p class="text-zinc-200 font-medium mb-1">Upload Result Slip</p>
-            <p class="text-zinc-500 text-sm">Tap here to select portal screenshot</p>
+            <p class="text-zinc-500 text-sm">Drag & drop or click to select image</p>
           </div>
-          <div class="flex items-center justify-center gap-2 pt-2">
-            <span class="text-xs text-zinc-500">or</span>
+
+          <!-- Quick Action Buttons -->
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 pt-1">
+            <button
+              id="paste-clipboard-btn"
+              type="button"
+              @click="pasteFromClipboard"
+              class="flex-1 py-2.5 px-4 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700 hover:border-zinc-600 text-zinc-200 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm active:scale-98"
+            >
+              <ClipboardPaste class="w-4 h-4 text-emerald-400" />
+              <span>Paste from Clipboard</span>
+              <kbd class="hidden sm:inline-block px-1.5 py-0.5 text-[10px] bg-zinc-900 border border-zinc-700/80 rounded text-zinc-400 font-mono">Ctrl+V</kbd>
+            </button>
+
             <button
               id="load-sample-slip-btn"
               type="button"
               @click="loadSampleSlip"
-              class="text-xs text-emerald-400 hover:text-emerald-300 font-medium underline underline-offset-4 cursor-pointer"
+              class="py-2.5 px-4 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm active:scale-98"
             >
-              Try with sample result slip
+              <Sparkles class="w-3.5 h-3.5" />
+              <span>Try with sample slip</span>
             </button>
           </div>
+
+          <p class="text-center text-[11px] text-zinc-500 pt-1">
+            Tip: Press <kbd class="px-1.5 py-0.5 bg-zinc-800/80 border border-zinc-700 rounded font-mono text-zinc-400 text-[10px]">Ctrl+V</kbd> or <kbd class="px-1.5 py-0.5 bg-zinc-800/80 border border-zinc-700 rounded font-mono text-zinc-400 text-[10px]">⌘+V</kbd> anywhere to paste a screenshot.
+          </p>
+
           <input
             id="scanner-file-input"
             ref="fileInput"
