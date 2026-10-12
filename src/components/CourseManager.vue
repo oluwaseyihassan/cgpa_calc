@@ -268,8 +268,10 @@ onMounted(() => {
 
       <div class="flex justify-end mb-4">
         <button
+          id="scan-result-slip-btn"
+          data-testid="scan-result-slip-btn"
           @click="isScannerOpen = true"
-          class="flex items-center text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition-colors"
+          class="flex items-center text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition-colors cursor-pointer"
         >
           <Camera class="w-3.5 h-3.5 mr-1.5" />
           Scan Result Slip
