@@ -1,13 +1,18 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { dbService } from '@/services/db'
 
 export const useUserStore = defineStore('user', () => {
   const profile = ref({
     name: 'Guest User',
-    name: 'Guest User',
     department: 'General',
     biometricsEnabled: false,
+    decimalPlaces: 2,
+  })
+
+  const decimalPlaces = computed(() => {
+    const val = Number(profile.value.decimalPlaces)
+    return isNaN(val) || val < 1 || val > 4 ? 2 : val
   })
 
   // Auth state - simplified for simulation
@@ -99,6 +104,7 @@ export const useUserStore = defineStore('user', () => {
 
   return {
     profile,
+    decimalPlaces,
     isAuthenticated,
     loadProfile,
     updateProfile,

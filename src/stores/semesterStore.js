@@ -1,9 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { dbService } from '@/services/db'
+import { useUserStore } from '@/stores/userStore'
 
 export const useSemesterStore = defineStore('semester', () => {
   const semesters = ref([])
+  const userStore = useUserStore()
 
   // Load all semesters from DB (Force HMR)
   async function loadAll() {
@@ -133,7 +135,8 @@ export const useSemesterStore = defineStore('semester', () => {
       })
     })
 
-    return totalUnits === 0 ? 0.0 : (totalPoints / totalUnits).toFixed(2)
+    const decimals = userStore.decimalPlaces ?? 2
+    return totalUnits === 0 ? (0).toFixed(decimals) : (totalPoints / totalUnits).toFixed(decimals)
   })
 
   const totalUnits = computed(() => {
@@ -163,6 +166,7 @@ export const useSemesterStore = defineStore('semester', () => {
   const gpaTrend = computed(() => {
     let cumulativePoints = 0
     let cumulativeUnits = 0
+    const decimals = userStore.decimalPlaces ?? 2
 
     return semesters.value.map((sem) => {
       let semPoints = 0
@@ -177,15 +181,15 @@ export const useSemesterStore = defineStore('semester', () => {
 
       return {
         semester: sem.name,
-        gpa: semUnits === 0 ? 0 : Number((semPoints / semUnits).toFixed(2)),
-        cgpa: cumulativeUnits === 0 ? 0 : Number((cumulativePoints / cumulativeUnits).toFixed(2)),
+        gpa: semUnits === 0 ? 0 : Number((semPoints / semUnits).toFixed(decimals)),
+        cgpa: cumulativeUnits === 0 ? 0 : Number((cumulativePoints / cumulativeUnits).toFixed(decimals)),
       }
     })
   })
 
-  // Calculate GPA for a specific semester
   function getSemesterGpa(semester) {
-    if (!semester || !semester.courses || semester.courses.length === 0) return '0.00'
+    const decimals = userStore.decimalPlaces ?? 2
+    if (!semester || !semester.courses || semester.courses.length === 0) return (0).toFixed(decimals)
 
     let totalPoints = 0
     let totalUnits = 0
@@ -195,7 +199,7 @@ export const useSemesterStore = defineStore('semester', () => {
       totalUnits += Number(course.unit)
     })
 
-    return totalUnits === 0 ? '0.00' : (totalPoints / totalUnits).toFixed(2)
+    return totalUnits === 0 ? (0).toFixed(decimals) : (totalPoints / totalUnits).toFixed(decimals)
   }
 
   async function clearAllSemesters() {

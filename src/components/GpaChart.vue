@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useSemesterStore } from '@/stores/semesterStore'
+import { useUserStore } from '@/stores/userStore'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -27,6 +28,7 @@ ChartJS.register(
 )
 
 const semesterStore = useSemesterStore()
+const userStore = useUserStore()
 const isExpanded = ref(false)
 
 const showGpa = ref(true)
@@ -134,7 +136,8 @@ const options = {
       usePointStyle: true,
       callbacks: {
         label: (context) => {
-          const val = Number(context.raw).toFixed(2)
+          const decimals = userStore.decimalPlaces ?? 2
+          const val = Number(context.raw).toFixed(decimals)
           return ` ${context.dataset.label}: ${val}`
         },
       },
